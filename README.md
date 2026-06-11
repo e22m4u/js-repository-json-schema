@@ -1,6 +1,7 @@
 ## @e22m4u/js-repository-json-schema
 
-Модуль генерации *JSON Schema (Draft 2020-12)* для
+Модуль генерации
+[*JSON Schema Draft 2020-12*](https://json-schema.org/draft/2020-12/json-schema-core) для
 [@e22m4u/js-repository](http://www.npmjs.com/package/@e22m4u/js-repository)
 
 ## Содержание
