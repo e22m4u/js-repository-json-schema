@@ -69,7 +69,6 @@ console.log(schema);
 //   "properties": {
 //     "firstName": {
 //       "type": "string",
-//       "example": ""
 //     },
 //     "age": {
 //       "type": "number",
@@ -77,7 +76,6 @@ console.log(schema);
 //     },
 //     "isActive": {
 //       "type": "boolean",
-//       "example": false
 //     }
 //   },
 //   "required": [

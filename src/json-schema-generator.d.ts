@@ -8,7 +8,6 @@ interface JsonSchema {
   properties?: Record<string, JsonSchema>;
   required?: string[];
   items?: JsonSchema;
-  example?: unknown;
   default?: unknown;
   $ref?: string;
   allOf?: JsonSchema[];

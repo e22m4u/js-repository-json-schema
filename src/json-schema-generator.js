@@ -96,7 +96,7 @@ export class JsonSchemaGenerator extends Service {
 
   /**
    * Проверка опций генератора.
-   * 
+   *
    * @param {object} options
    * @private
    */
@@ -195,21 +195,18 @@ export class JsonSchemaGenerator extends Service {
     if (propDef.type === DataType.ARRAY && propDef.itemType) {
       schema.items = this._createSchemaByType(propDef.itemType);
     }
-    // установка реального default, если он задан,
-    // то example удаляется, чтобы не дублировать логику
+    // установка реального default
     if (propDef.default !== undefined) {
       schema.default =
         typeof propDef.default === 'function'
           ? propDef.default()
           : propDef.default;
-      delete schema.example;
     }
     return schema;
   }
 
   /**
    * Создание примитивной схемы в зависимости от типа данных.
-   * Добавляет 'example' с пустым значением для Swagger.
    *
    * @param   {string} dataType Тип данных
    * @returns {object}
@@ -218,21 +215,21 @@ export class JsonSchemaGenerator extends Service {
   _createSchemaByType(dataType) {
     switch (dataType) {
       case DataType.STRING:
-        return {type: 'string', example: ''};
+        return {type: 'string'};
       case DataType.NUMBER:
-        return {type: 'number', example: 0};
+        return {type: 'number'};
       case DataType.BOOLEAN:
-        return {type: 'boolean', example: false};
+        return {type: 'boolean'};
       case DataType.ARRAY:
-        return {type: 'array', example: []};
+        return {type: 'array'};
       case DataType.OBJECT:
-        return {type: 'object', example: {}};
+        return {type: 'object'};
       case DataType.ANY:
-        return {example: ''}; // any type
+        return {}; // any type
       default:
         // фолбэк для нераспознанных типов
         // (например, если передали 'string' напрямую)
-        return {type: dataType, example: dataType === 'number' ? 0 : ''};
+        return {type: dataType};
     }
   }
 
@@ -296,9 +293,8 @@ export class JsonSchemaGenerator extends Service {
           !propertiesDef[foreignKey] &&
           !opts.excludeProperties.includes(foreignKey)
         ) {
-          schema.properties[foreignKey] = this._createSchemaByType(
-            foreignKeyDataType,
-          );
+          schema.properties[foreignKey] =
+            this._createSchemaByType(foreignKeyDataType);
         }
         // дискриминатор (для полиморфных связей)
         if (relDef.polymorphic) {
@@ -325,7 +321,6 @@ export class JsonSchemaGenerator extends Service {
           schema.properties[foreignKey] = {
             type: 'array',
             items: this._createSchemaByType(foreignKeyDataType),
-            example: [],
           };
         }
       }
