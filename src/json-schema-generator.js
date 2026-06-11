@@ -83,9 +83,12 @@ export class JsonSchemaGenerator extends Service {
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
     }
+    // применение ключей-расширений уровня модели
+    const modelExtensions = this._resolveExtensionKeywords(modelDef);
+    Object.assign(schema, modelExtensions);
     // обработка наследования (иерархия моделей)
-    // если у модели есть базовая модель, мы не разворачиваем её свойства,
-    // а используем allOf с ссылкой ($ref) на родительскую схему
+    // если у модели есть базовая модель, то используется ключевое
+    // слово allOf с ссылкой ($ref) на родительскую схему
     if (modelDef.base) {
       return {
         allOf: [opts.refFactory(modelDef.base), schema],
@@ -202,6 +205,9 @@ export class JsonSchemaGenerator extends Service {
           ? propDef.default()
           : propDef.default;
     }
+    // применение ключей-расширений для свойства
+    const propExtensions = this._resolveExtensionKeywords(propDef);
+    Object.assign(schema, propExtensions);
     return schema;
   }
 
@@ -368,5 +374,26 @@ export class JsonSchemaGenerator extends Service {
     }
     // во всех остальных случаях используется значение по умолчанию
     return opts.defaultPrimaryKeyType;
+  }
+
+  /**
+   * Извлечение ключей-расширений из определения
+   * модели или свойства.
+   *
+   * @param   {object} def Опеределение модели или свойства.
+   * @returns {object} Объект содержащий ключи-расширений без префикса.
+   */
+  _resolveExtensionKeywords(def) {
+    const extensions = {};
+    const prefix = 'x-js-';
+    Object.keys(def).forEach(propName => {
+      if (propName.startsWith(prefix)) {
+        const keyword = propName.slice(prefix.length);
+        if (keyword) {
+          extensions[keyword] = def[propName];
+        }
+      }
+    });
+    return extensions;
   }
 }

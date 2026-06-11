@@ -8,7 +8,6 @@
 
 - [Установка](#установка)
 - [Использование](#использование)
-- [Параметры](#параметры)
 - [Тесты](#тесты)
 - [Лицензия](#лицензия)
 
@@ -40,7 +39,7 @@ const {JsonSchemaGenerator} = require('@e22m4u/js-repository-json-schema');
 import {DataType, DatabaseSchema} from '@e22m4u/js-repository';
 import {JsonSchemaGenerator} from '@e22m4u/js-repository-json-schema';
 
-// создание схемы БД, определение источника данных и модели
+// создание схемы баз данных, определение источника данных и модели
 const dbs = new DatabaseSchema();
 
 dbs.defineModel({
@@ -88,9 +87,9 @@ console.log(schema);
 *i. Если для модели определен источник данных, то генератор автоматически
 добавит первичный ключ (*id*), если он не был описан вручную.*
 
-## Параметры
+### Параметры схемы
 
-Метод `genSchema` принимает второй необязательный аргумент с настройками схемы.
+Метод `genSchema` принимает второй необязательный аргумент с настройками.
 
 ```js
 const schema = generator.genSchema('user', {
@@ -107,6 +106,56 @@ const schema = generator.genSchema('user', {
   defaultPrimaryKeyType: 'string',
 });
 ```
+
+### Ключи-расширения (x-js-*)
+
+Для добавления специфичных ключевых слов *JSON Schema* в определении модели
+используестся префикс `x-js-*`. При генерации схемы этот префикс будет
+автоматически удален, а сами ключи добавлены в итоговый объект.
+
+```js
+dbs.defineModel({
+  name: 'user',
+  // расширения на уровне модели
+  'x-js-title': 'User Model',
+  'x-js-description': 'Схема данных пользователя',
+  properties: {
+    email: {
+      type: DataType.STRING,
+      required: true,
+      // расширения на уровне свойства
+      'x-js-format': 'email',
+      'x-js-maxLength': 255,
+    },
+  },
+});
+
+const schema = generator.genSchema('user');
+console.log(schema);
+// {
+//   "type": "object",
+//   "title": "User Model",
+//   "description": "Схема данных пользователя",
+//   "properties": {
+//     "id": {
+//       "type": "number"
+//     },
+//     "email": {
+//       "type": "string",
+//       "format": "email",
+//       "maxLength": 255
+//     }
+//   },
+//   "required": [
+//     "email"
+//   ]
+// }
+```
+
+Ключи-расширения применяются к схеме в самом конце генерации. Это означает,
+что с помощью `x-js-*` можно не только добавлять новые ключевые слова,
+но и принудительно переопределять сгенерированные (например, при использовании
+`x-js-type` будет переопределен тип, указанный в модели).
 
 ## Тесты
 

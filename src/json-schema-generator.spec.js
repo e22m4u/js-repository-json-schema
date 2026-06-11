@@ -73,5 +73,42 @@ describe('JsonSchemaGenerator', function () {
         DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
       );
     });
+
+    describe('extension keywords (x-js-*)', function () {
+      it('should extract extensions from model definition and apply them without prefix', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'user',
+          'x-js-title': 'User Model',
+          'x-js-description': 'Schema for user',
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('user');
+        expect(schema.title).to.be.eq('User Model');
+        expect(schema.description).to.be.eq('Schema for user');
+        expect(schema['x-js-title']).to.be.undefined;
+      });
+
+      it('should extract extensions from property definition and apply them without prefix', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'user',
+          properties: {
+            email: {
+              type: DataType.STRING,
+              'x-js-format': 'email',
+              'x-js-description': 'User email address',
+            },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('user');
+        expect(schema.properties.email.format).to.be.eq('email');
+        expect(schema.properties.email.description).to.be.eq(
+          'User email address',
+        );
+        expect(schema.properties.email['x-js-format']).to.be.undefined;
+      });
+    });
   });
 });

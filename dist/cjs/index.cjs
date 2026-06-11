@@ -85,6 +85,8 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
     }
+    const modelExtensions = this._resolveExtensionKeywords(modelDef);
+    Object.assign(schema, modelExtensions);
     if (modelDef.base) {
       return {
         allOf: [opts.refFactory(modelDef.base), schema]
@@ -175,6 +177,8 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     if (propDef.default !== void 0) {
       schema.default = typeof propDef.default === "function" ? propDef.default() : propDef.default;
     }
+    const propExtensions = this._resolveExtensionKeywords(propDef);
+    Object.assign(schema, propExtensions);
     return schema;
   }
   /**
@@ -301,6 +305,26 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     } catch {
     }
     return opts.defaultPrimaryKeyType;
+  }
+  /**
+   * Извлечение ключей-расширений из определения
+   * модели или свойства.
+   *
+   * @param   {object} def Опеределение модели или свойства.
+   * @returns {object} Объект содержащий ключи-расширений без префикса.
+   */
+  _resolveExtensionKeywords(def) {
+    const extensions = {};
+    const prefix = "x-js-";
+    Object.keys(def).forEach((propName) => {
+      if (propName.startsWith(prefix)) {
+        const keyword = propName.slice(prefix.length);
+        if (keyword) {
+          extensions[keyword] = def[propName];
+        }
+      }
+    });
+    return extensions;
   }
 };
 // Annotate the CommonJS export names for ESM import in node:
