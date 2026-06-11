@@ -239,7 +239,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties.myCustomTargetId).to.be.eql({type: 'number'});
       });
 
-      it('should infer foreign key type from the target model primary key', function () {
+      it('should infer foreign key type from the primary key of a target model', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'targetModel',
@@ -357,7 +357,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.not.have.property('sourceId');
       });
 
-      it('should not overwrite explicitly defined properties by a "belongsTo" definition', function () {
+      it('should not overwrite explicitly defined properties with a "belongsTo" definition', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'targetModel',
@@ -382,7 +382,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties.targetId).to.be.eql({type: 'string'});
       });
 
-      it('should not overwrite explicitly defined properties by a "referencesMany" definition', function () {
+      it('should not overwrite explicitly defined properties with a "referencesMany" definition', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'targetModel',
@@ -432,7 +432,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.not.have.property('targetId');
       });
 
-      it('should throw an error if a relation target model is not defined', function () {
+      it('should throw an error if a target model of a relation is not defined', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'sourceModel',
