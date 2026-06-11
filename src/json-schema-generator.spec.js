@@ -65,10 +65,24 @@ describe('JsonSchemaGenerator', function () {
       expect(throwable).to.throw('Model "model" is not defined.');
     });
 
-    describe('generating implicit primary key', function () {
-      it('should inject a primary key at the beginning of the properties object', function () {
+    describe('generating an implicit primary key', function () {
+      it('should inject a primary key if a datasource is defined', function () {
         const dbs = new DatabaseSchema();
         dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({name: 'modelWithDb', datasource: 'memory'});
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('modelWithDb');
+        expect(schema.properties).to.have.property(
+          DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+        );
+      });
+
+      it('should inject a primary key at the beginning of the properties object', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({
+          name: 'memory',
+          adapter: 'memory',
+        });
         dbs.defineModel({
           name: 'modelWithDbAndProps',
           datasource: 'memory',
@@ -85,17 +99,6 @@ describe('JsonSchemaGenerator', function () {
         expect(propertyKeys[2]).to.be.eq('age');
       });
 
-      it('should inject a primary key if a datasource is defined', function () {
-        const dbs = new DatabaseSchema();
-        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
-        dbs.defineModel({name: 'modelWithDb', datasource: 'memory'});
-        const S = dbs.getService(JsonSchemaGenerator);
-        const schema = S.genSchema('modelWithDb');
-        expect(schema.properties).to.have.property(
-          DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
-        );
-      });
-
       it('should not inject a primary key if a datasource is not defined', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({name: 'modelWithoutDb'});
@@ -108,7 +111,7 @@ describe('JsonSchemaGenerator', function () {
     });
 
     describe('processing explicit properties', function () {
-      it('should map explicitly defined properties to "properties" keyword', function () {
+      it('should map explicitly defined properties to the "properties" object', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'model',
@@ -194,9 +197,11 @@ describe('JsonSchemaGenerator', function () {
     });
 
     describe('injecting implicit foreign keys', function () {
-      it('should inject implicit foreign key for a regular "belongsTo" relation', function () {
+      it('should inject an implicit foreign key for a regular "belongsTo" relation', function () {
         const dbs = new DatabaseSchema();
-        dbs.defineModel({name: 'targetModel'});
+        dbs.defineModel({
+          name: 'targetModel',
+        });
         dbs.defineModel({
           name: 'sourceModel',
           relations: {
@@ -214,7 +219,9 @@ describe('JsonSchemaGenerator', function () {
 
       it('should use a custom foreign key name if provided in "belongsTo" relation', function () {
         const dbs = new DatabaseSchema();
-        dbs.defineModel({name: 'targetModel'});
+        dbs.defineModel({
+          name: 'targetModel',
+        });
         dbs.defineModel({
           name: 'sourceModel',
           relations: {
@@ -301,7 +308,10 @@ describe('JsonSchemaGenerator', function () {
         dbs.defineModel({
           name: 'targetModel',
           properties: {
-            id: {type: DataType.STRING, primaryKey: true},
+            id: {
+              type: DataType.STRING,
+              primaryKey: true,
+            },
           },
         });
         dbs.defineModel({
@@ -347,9 +357,11 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.not.have.property('sourceId');
       });
 
-      it('should not overwrite explicitly defined properties', function () {
+      it('should not overwrite explicitly defined properties by a "belongsTo" definition', function () {
         const dbs = new DatabaseSchema();
-        dbs.defineModel({name: 'targetModel'});
+        dbs.defineModel({
+          name: 'targetModel',
+        });
         dbs.defineModel({
           name: 'sourceModel',
           properties: {
@@ -370,9 +382,40 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties.targetId).to.be.eql({type: 'string'});
       });
 
+      it('should not overwrite explicitly defined properties by a "referencesMany" definition', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'targetModel',
+        });
+        dbs.defineModel({
+          name: 'sourceModel',
+          properties: {
+            targetIds: {
+              type: DataType.ARRAY,
+              itemType: DataType.STRING,
+            },
+          },
+          relations: {
+            targets: {
+              type: RelationType.REFERENCES_MANY,
+              model: 'targetModel',
+            },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('sourceModel');
+        expect(schema.properties).to.have.property('targetIds');
+        expect(schema.properties.targetIds).to.be.eql({
+          type: 'array',
+          items: {type: 'string'},
+        });
+      });
+
       it('should not inject foreign keys if they are in "excludeProperties" option', function () {
         const dbs = new DatabaseSchema();
-        dbs.defineModel({name: 'targetModel'});
+        dbs.defineModel({
+          name: 'targetModel',
+        });
         dbs.defineModel({
           name: 'sourceModel',
           relations: {
@@ -389,7 +432,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.not.have.property('targetId');
       });
 
-      it('should throw an error if target model of a relation is not defined', function () {
+      it('should throw an error if a relation target model is not defined', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'sourceModel',
@@ -410,7 +453,7 @@ describe('JsonSchemaGenerator', function () {
     });
 
     describe('extension keywords (x-js-*)', function () {
-      it('should extract extension keywords from model definition and apply them without prefix', function () {
+      it('should extract extension keywords from a model definition and apply them without prefix', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'user',
@@ -424,7 +467,7 @@ describe('JsonSchemaGenerator', function () {
         expect(schema['x-js-title']).to.be.undefined;
       });
 
-      it('should extract extension keywords from property definition and apply them without prefix', function () {
+      it('should extract extension keywords from a property definition and apply them without prefix', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
           name: 'user',
