@@ -488,5 +488,179 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties.email['x-js-format']).to.be.undefined;
       });
     });
+
+    describe('inheritance (hierarchy flattening)', function () {
+      it('should flatten properties from base models', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'baseModel',
+          properties: {
+            baseProp: DataType.STRING,
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          properties: {
+            childProp: DataType.NUMBER,
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+        expect(schema.allOf).to.be.undefined;
+        expect(schema.properties).to.have.property('baseProp');
+        expect(schema.properties.baseProp).to.be.eql({type: 'string'});
+        expect(schema.properties).to.have.property('childProp');
+        expect(schema.properties.childProp).to.be.eql({type: 'number'});
+      });
+
+      it('should inherit a primary key definition from a base model', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({
+          name: 'baseModel',
+          datasource: 'memory',
+          properties: {
+            customId: {
+              type: DataType.STRING,
+              primaryKey: true,
+            },
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          datasource: 'memory',
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+        expect(schema.properties).to.not.have.property(
+          DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+        );
+        expect(schema.properties).to.have.property('customId');
+        expect(schema.properties.customId).to.be.eql({type: 'string'});
+      });
+
+      it('should use a primary key definition from a child model', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({
+          name: 'baseModel',
+          datasource: 'memory',
+          properties: {
+            baseProp: DataType.NUMBER,
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          datasource: 'memory',
+          properties: {
+            customId: {
+              type: DataType.STRING,
+              primaryKey: true,
+            },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+        expect(schema.properties).to.not.have.property(
+          DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+        );
+        expect(schema.properties).to.have.property('baseProp');
+        expect(schema.properties.baseProp).to.be.eql({type: 'number'});
+        expect(schema.properties).to.have.property('customId');
+        expect(schema.properties.customId).to.be.eql({type: 'string'});
+      });
+
+      it('should flatten relations and inject foreign keys from base models', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'targetModel',
+        });
+        dbs.defineModel({
+          name: 'baseModel',
+          relations: {
+            baseTarget: {
+              type: RelationType.BELONGS_TO,
+              model: 'targetModel',
+            },
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          relations: {
+            childTarget: {
+              type: RelationType.BELONGS_TO,
+              model: 'targetModel',
+            },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+
+        expect(schema.properties).to.have.property('baseTargetId');
+        expect(schema.properties).to.have.property('childTargetId');
+      });
+
+      it('should override base properties in a child model', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'baseModel',
+          properties: {
+            sharedProp: DataType.STRING,
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          properties: {
+            sharedProp: DataType.NUMBER,
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+
+        expect(schema.properties.sharedProp).to.be.eql({type: 'number'});
+      });
+
+      it('should collect required fields from the entire hierarchy properly', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'baseModel',
+          properties: {
+            baseProp: {
+              type: DataType.STRING,
+              required: true,
+            },
+            overridableProp: {
+              type: DataType.STRING,
+              required: true,
+            },
+          },
+        });
+        dbs.defineModel({
+          name: 'childModel',
+          base: 'baseModel',
+          properties: {
+            childProp: {
+              type: DataType.STRING,
+              required: true,
+            },
+            overridableProp: {
+              type: DataType.STRING,
+              required: false,
+            },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('childModel');
+        expect(schema.required).to.be.an('array');
+        expect(schema.required).to.include('baseProp');
+        expect(schema.required).to.include('childProp');
+        expect(schema.required).to.not.include('overridableProp');
+      });
+    });
   });
 });

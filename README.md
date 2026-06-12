@@ -61,6 +61,7 @@ dbs.defineModel({
 const generator = dbs.getService(JsonSchemaGenerator);
 
 // генерация JSON-схемы по названию модели
+// (на данном этапе модель должна быть определена)
 const schema = generator.genSchema('user');
 
 console.log(schema);

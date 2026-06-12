@@ -1,11 +1,11 @@
 import {Service} from '@e22m4u/js-service';
-import {InvalidArgumentError} from '@e22m4u/js-format';
 
 import {
   DataType,
   singularize,
   RelationType,
   DefinitionRegistry,
+  InvalidArgumentError,
   ModelDefinitionUtils,
   DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
 } from '@e22m4u/js-repository';
@@ -57,7 +57,10 @@ export class JsonSchemaGenerator extends Service {
       properties: {},
     };
     const requiredFields = [];
-    const propertiesDef = modelDef.properties || {};
+    // получение определений свойств по всей иерархии базовых моделей
+    const utils = this.getService(ModelDefinitionUtils);
+    const propertiesDef =
+      utils.getPropertiesDefinitionInBaseModelHierarchy(modelName);
     // обработка неявного первичного ключа (primary key)
     this._injectImplicitPrimaryKeyIfNeeded(
       modelDef,
@@ -65,7 +68,7 @@ export class JsonSchemaGenerator extends Service {
       schema,
       opts,
     );
-    // обработка явно заданных свойств модели
+    // обработка свойств модели, полученных согласно иерархии
     for (const [propName, propDef] of Object.entries(propertiesDef)) {
       if (opts.excludeProperties.includes(propName)) {
         continue;
@@ -76,9 +79,12 @@ export class JsonSchemaGenerator extends Service {
         requiredFields.push(propName);
       }
     }
+    // получение связей по всей иерархии базовых моделей
+    const relationsDef =
+      utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
     // обработка неявных внешних ключей от связей
     // (foreign keys & discriminators)
-    this._injectImplicitForeignKeys(modelDef, propertiesDef, schema, opts);
+    this._injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts);
     // добавление массива required, если есть обязательные поля
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
@@ -86,14 +92,6 @@ export class JsonSchemaGenerator extends Service {
     // применение ключей-расширений уровня модели
     const modelExtensions = this._resolveExtensionKeywords(modelDef);
     Object.assign(schema, modelExtensions);
-    // обработка наследования (иерархия моделей)
-    // если у модели есть базовая модель, то используется ключевое
-    // слово allOf с ссылкой ($ref) на родительскую схему
-    if (modelDef.base) {
-      return {
-        allOf: [opts.refFactory(modelDef.base), schema],
-      };
-    }
     return schema;
   }
 
@@ -241,8 +239,7 @@ export class JsonSchemaGenerator extends Service {
 
   /**
    * Добавление неявного первичного ключа, если он не был задан
-   * в свойствах текущей модели и если модель не наследуется
-   * от другой.
+   * в свойствах текущей модели и ее родителей.
    *
    * @param {object} modelDef
    * @param {object} propertiesDef
@@ -254,11 +251,6 @@ export class JsonSchemaGenerator extends Service {
     // если источник данных не указан,
     // неявный первичный ключ генерировать не нужно
     if (!modelDef.datasource) {
-      return;
-    }
-    // если модель наследуется, то предполагается,
-    // что первичный ключ определен у родителя
-    if (modelDef.base) {
       return;
     }
     // поиск явно заданного первичного ключа в свойствах
@@ -279,15 +271,14 @@ export class JsonSchemaGenerator extends Service {
    * которые возникают из-за связей (relations), но не описаны явно
    * в properties.
    *
-   * @param {object} modelDef
+   * @param {object} relationsDef
    * @param {object} propertiesDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitForeignKeys(modelDef, propertiesDef, schema, opts) {
-    const relations = modelDef.relations || {};
-    for (const [relName, relDef] of Object.entries(relations)) {
+  _injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts) {
+    for (const [relName, relDef] of Object.entries(relationsDef)) {
       // определение типа ключа для текущей связи
       const foreignKeyDataType = this._resolveForeignKeyDataType(relDef, opts);
       // обработка связи belongsTo

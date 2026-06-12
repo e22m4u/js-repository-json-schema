@@ -27,7 +27,6 @@ module.exports = __toCommonJS(index_exports);
 
 // src/json-schema-generator.js
 var import_js_service = require("@e22m4u/js-service");
-var import_js_format = require("@e22m4u/js-format");
 var import_js_repository = require("@e22m4u/js-repository");
 var JsonSchemaGenerator = class extends import_js_service.Service {
   static {
@@ -45,13 +44,13 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    */
   genSchema(modelName, options = {}) {
     if (!modelName || typeof modelName !== "string") {
-      throw new import_js_format.InvalidArgumentError(
+      throw new import_js_repository.InvalidArgumentError(
         'Parameter "modelName" must be a non-empty String, but %v was given.',
         modelName
       );
     }
     if (options === null || typeof options !== "object" || Array.isArray(options)) {
-      throw new import_js_format.InvalidArgumentError(
+      throw new import_js_repository.InvalidArgumentError(
         'Parameter "options" must be an Object, but %v was given.',
         options
       );
@@ -65,7 +64,8 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       properties: {}
     };
     const requiredFields = [];
-    const propertiesDef = modelDef.properties || {};
+    const utils = this.getService(import_js_repository.ModelDefinitionUtils);
+    const propertiesDef = utils.getPropertiesDefinitionInBaseModelHierarchy(modelName);
     this._injectImplicitPrimaryKeyIfNeeded(
       modelDef,
       propertiesDef,
@@ -81,17 +81,13 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
         requiredFields.push(propName);
       }
     }
-    this._injectImplicitForeignKeys(modelDef, propertiesDef, schema, opts);
+    const relationsDef = utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
+    this._injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts);
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
     }
     const modelExtensions = this._resolveExtensionKeywords(modelDef);
     Object.assign(schema, modelExtensions);
-    if (modelDef.base) {
-      return {
-        allOf: [opts.refFactory(modelDef.base), schema]
-      };
-    }
     return schema;
   }
   /**
@@ -103,14 +99,14 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
   _validateOptions(options) {
     if (options.excludeProperties !== void 0) {
       if (!Array.isArray(options.excludeProperties)) {
-        throw new import_js_format.InvalidArgumentError(
+        throw new import_js_repository.InvalidArgumentError(
           'Option "excludeProperties" must be an Array, but %v was given.',
           options.excludeProperties
         );
       }
       options.excludeProperties.forEach((propertyName, index) => {
         if (!propertyName || typeof propertyName !== "string") {
-          throw new import_js_format.InvalidArgumentError(
+          throw new import_js_repository.InvalidArgumentError(
             'Element %d of the option "excludeProperties" must be a non-empty String, but %v was given.',
             index,
             propertyName
@@ -119,13 +115,13 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       });
     }
     if (options.refFactory !== void 0 && typeof options.refFactory !== "function") {
-      throw new import_js_format.InvalidArgumentError(
+      throw new import_js_repository.InvalidArgumentError(
         'Option "refFactory" must be a Function, but %v was given.',
         options.refFactory
       );
     }
     if (options.defaultPrimaryKeyType !== void 0 && !["string", "number"].includes(options.defaultPrimaryKeyType)) {
-      throw new import_js_format.InvalidArgumentError(
+      throw new import_js_repository.InvalidArgumentError(
         'Option "defaultPrimaryKeyType" allows "number" or "string" value, but %v was given.',
         options.defaultPrimaryKeyType
       );
@@ -209,8 +205,7 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
   }
   /**
    * Добавление неявного первичного ключа, если он не был задан
-   * в свойствах текущей модели и если модель не наследуется
-   * от другой.
+   * в свойствах текущей модели и ее родителей.
    *
    * @param {object} modelDef
    * @param {object} propertiesDef
@@ -220,9 +215,6 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    */
   _injectImplicitPrimaryKeyIfNeeded(modelDef, propertiesDef, schema, opts) {
     if (!modelDef.datasource) {
-      return;
-    }
-    if (modelDef.base) {
       return;
     }
     const hasExplicitPk = Object.values(propertiesDef).some(
@@ -239,15 +231,14 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * которые возникают из-за связей (relations), но не описаны явно
    * в properties.
    *
-   * @param {object} modelDef
+   * @param {object} relationsDef
    * @param {object} propertiesDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitForeignKeys(modelDef, propertiesDef, schema, opts) {
-    const relations = modelDef.relations || {};
-    for (const [relName, relDef] of Object.entries(relations)) {
+  _injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts) {
+    for (const [relName, relDef] of Object.entries(relationsDef)) {
       const foreignKeyDataType = this._resolveForeignKeyDataType(relDef, opts);
       if (relDef.type === import_js_repository.RelationType.BELONGS_TO) {
         const foreignKey = relDef.foreignKey || `${relName}Id`;
@@ -290,7 +281,7 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     }
     const registry = this.getService(import_js_repository.DefinitionRegistry);
     if (!registry.hasModel(relDef.model)) {
-      throw new import_js_format.InvalidArgumentError(
+      throw new import_js_repository.InvalidArgumentError(
         "Model %v must be registered before generating a JSON Schema.",
         relDef.model
       );
