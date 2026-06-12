@@ -57,7 +57,10 @@ dbs.defineModel({
       type: DataType.NUMBER,
       default: 18,         // будет добавлено поле "default"
     },
-    isActive: DataType.BOOLEAN,
+    isActive: {
+      type: DataType.BOOLEAN,
+      'x-js-examples': [true, false], // специфичное для Json Schema поле
+    },
   },
 });
 
@@ -81,6 +84,7 @@ console.log(schema);
 //     },
 //     "isActive": {
 //       "type": "boolean",
+//       "examples": [true, false]
 //     }
 //   },
 //   "required": [
