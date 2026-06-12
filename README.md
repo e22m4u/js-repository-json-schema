@@ -196,11 +196,6 @@ dbs.defineModel({
       type: RelationType.BELONGS_TO,
       model: 'category'
     },
-    // внедрит массив "tagIds"
-    tags: {
-      type: RelationType.REFERENCES_MANY,
-      model: 'tag'
-    },
     // внедрит "ownerId" (число по умолчанию)
     // и "ownerType" (строка)
     owner: {
@@ -217,12 +212,6 @@ console.log(schema);
 //   "properties": {
 //     "categoryId": {
 //       "type": "string"
-//     },
-//     "tagIds": {
-//       "type": "array",
-//       "items": {
-//         "type": "number"
-//       }
 //     },
 //     "ownerId": {
 //       "type": "number"
