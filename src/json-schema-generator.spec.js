@@ -663,4 +663,100 @@ describe('JsonSchemaGenerator', function () {
       });
     });
   });
+
+  describe('_validateOptions', function () {
+    it('should require the option "excludeProperties" to be an Array', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const throwable = v => () => {
+        return S._validateOptions({excludeProperties: v});
+      };
+      const error = s =>
+        format(
+          'Option "excludeProperties" must be an Array, but %s was given.',
+          s,
+        );
+      expect(throwable('str')).to.throw(error('"str"'));
+      expect(throwable('')).to.throw(error('""'));
+      expect(throwable(10)).to.throw(error('10'));
+      expect(throwable(0)).to.throw(error('0'));
+      expect(throwable(true)).to.throw(error('true'));
+      expect(throwable(false)).to.throw(error('false'));
+      expect(throwable({})).to.throw(error('Object'));
+      expect(throwable(null)).to.throw(error('null'));
+      throwable([])();
+      throwable(undefined)();
+    });
+
+    it('should require elements of the option "excludeProperties" to be a non-empty String', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const throwable = v => () => {
+        return S._validateOptions({excludeProperties: [v]});
+      };
+      const error = s =>
+        format(
+          'Element 0 of the option "excludeProperties" ' +
+            'must be a non-empty String, but %s was given.',
+          s,
+        );
+      expect(throwable('')).to.throw(error('""'));
+      expect(throwable(10)).to.throw(error('10'));
+      expect(throwable(0)).to.throw(error('0'));
+      expect(throwable(true)).to.throw(error('true'));
+      expect(throwable(false)).to.throw(error('false'));
+      expect(throwable([])).to.throw(error('Array'));
+      expect(throwable({})).to.throw(error('Object'));
+      expect(throwable(undefined)).to.throw(error('undefined'));
+      expect(throwable(null)).to.throw(error('null'));
+      throwable('field')();
+    });
+
+    it('should require the option "refFactory" to be a Function', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const throwable = v => () => {
+        return S._validateOptions({refFactory: v});
+      };
+      const error = s =>
+        format('Option "refFactory" must be a Function, but %s was given.', s);
+      expect(throwable('str')).to.throw(error('"str"'));
+      expect(throwable('')).to.throw(error('""'));
+      expect(throwable(10)).to.throw(error('10'));
+      expect(throwable(0)).to.throw(error('0'));
+      expect(throwable(true)).to.throw(error('true'));
+      expect(throwable(false)).to.throw(error('false'));
+      expect(throwable([])).to.throw(error('Array'));
+      expect(throwable({})).to.throw(error('Object'));
+      expect(throwable(null)).to.throw(error('null'));
+      throwable(() => ({}))();
+      throwable(undefined)();
+    });
+
+    it('should require the option "defaultPrimaryKeyType" to be a correct value', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const throwable = v => () => {
+        return S._validateOptions({defaultPrimaryKeyType: v});
+      };
+      const error = s =>
+        format(
+          'Option "defaultPrimaryKeyType" allows "number" ' +
+            'or "string" value, but %s was given.',
+          s,
+        );
+      expect(throwable('str')).to.throw(error('"str"'));
+      expect(throwable('')).to.throw(error('""'));
+      expect(throwable(10)).to.throw(error('10'));
+      expect(throwable(0)).to.throw(error('0'));
+      expect(throwable(true)).to.throw(error('true'));
+      expect(throwable(false)).to.throw(error('false'));
+      expect(throwable([])).to.throw(error('Array'));
+      expect(throwable({})).to.throw(error('Object'));
+      expect(throwable(null)).to.throw(error('null'));
+      throwable('string')();
+      throwable('number')();
+      throwable(undefined)();
+    });
+  });
 });
