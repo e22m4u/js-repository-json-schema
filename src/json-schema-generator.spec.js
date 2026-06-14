@@ -765,7 +765,7 @@ describe('JsonSchemaGenerator', function () {
       const S = new JsonSchemaGenerator();
       const options = {
         excludeProperties: ['test'],
-        refFactory: modelName => modelName,
+        refFactory: modelName => ({$ref: modelName}),
         defaultPrimaryKeyType: 'string',
       };
       const res = S._normalizeOptions(options);
@@ -780,6 +780,83 @@ describe('JsonSchemaGenerator', function () {
       expect(res.excludeProperties).to.be.eql([]);
       expect(res.refFactory).to.be.a('function');
       expect(res.defaultPrimaryKeyType).to.be.eq('number');
+    });
+  });
+
+  describe('_mapPropertyToSchema', function () {
+    it('should return a schema for a short property definition', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema(DataType.STRING);
+      expect(res).to.be.eql({type: 'string'});
+    });
+
+    it('should return a schema for a full property definition', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema({type: DataType.STRING});
+      expect(res).to.be.eql({type: 'string'});
+    });
+
+    it('should return an empty object when no property definition was given', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema();
+      expect(res).to.be.eql({});
+    });
+
+    it('should return a result from the reference factory for an object definition with a model', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema(
+        {type: DataType.OBJECT, model: 'test'},
+        {refFactory: modelName => ({$ref: `#/${modelName}`})},
+      );
+      expect(res).to.be.eql({$ref: '#/test'});
+    });
+
+    it('should return a result from the reference factory for an array definition with a model', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema(
+        {type: DataType.ARRAY, itemModel: 'test'},
+        {refFactory: modelName => ({$ref: `#/${modelName}`})},
+      );
+      expect(res).to.be.eql({
+        type: 'array',
+        items: {$ref: '#/test'},
+      });
+    });
+
+    it('should set items schema when the "itemType" parameter is specified', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema({
+        type: DataType.ARRAY,
+        itemType: DataType.NUMBER,
+      });
+      expect(res).to.be.eql({
+        type: 'array',
+        items: {type: 'number'},
+      });
+    });
+
+    it('should set a default value when the "default" parameter is specified', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema({
+        type: DataType.STRING,
+        default: 'test',
+      });
+      expect(res).to.be.eql({
+        type: 'string',
+        default: 'test',
+      });
+    });
+
+    it('should set keyowrd-extensions to a result schema without the prefix', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._mapPropertyToSchema({
+        type: DataType.STRING,
+        'x-js-examples': ['foo', 'bar'],
+      });
+      expect(res).to.be.eql({
+        type: 'string',
+        examples: ['foo', 'bar'],
+      });
     });
   });
 });
