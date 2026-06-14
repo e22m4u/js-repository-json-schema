@@ -759,4 +759,27 @@ describe('JsonSchemaGenerator', function () {
       throwable(undefined)();
     });
   });
+
+  describe('_normalizeOptions', function () {
+    it('should return existing options as is', function () {
+      const S = new JsonSchemaGenerator();
+      const options = {
+        excludeProperties: ['test'],
+        refFactory: modelName => modelName,
+        defaultPrimaryKeyType: 'string',
+      };
+      const res = S._normalizeOptions(options);
+      expect(res.excludeProperties).to.be.eq(options.excludeProperties);
+      expect(res.refFactory).to.be.eq(options.refFactory);
+      expect(res.defaultPrimaryKeyType).to.be.eq(options.defaultPrimaryKeyType);
+    });
+
+    it('should set default values for non-existing options', function () {
+      const S = new JsonSchemaGenerator();
+      const res = S._normalizeOptions({});
+      expect(res.excludeProperties).to.be.eql([]);
+      expect(res.refFactory).to.be.a('function');
+      expect(res.defaultPrimaryKeyType).to.be.eq('number');
+    });
+  });
 });
