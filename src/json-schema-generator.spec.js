@@ -859,4 +859,18 @@ describe('JsonSchemaGenerator', function () {
       });
     });
   });
+
+  describe('_createSchemaByType', function () {
+    it('should return a schema for a given type', function () {
+      const S = new JsonSchemaGenerator();
+      const fn = S._createSchemaByType.bind(S);
+      expect(fn(DataType.STRING)).to.be.eql({type: 'string'});
+      expect(fn(DataType.NUMBER)).to.be.eql({type: 'number'});
+      expect(fn(DataType.BOOLEAN)).to.be.eql({type: 'boolean'});
+      expect(fn(DataType.ARRAY)).to.be.eql({type: 'array'});
+      expect(fn(DataType.OBJECT)).to.be.eql({type: 'object'});
+      expect(fn(DataType.ANY)).to.be.eql({});
+      expect(fn('unknown')).to.be.eql({type: 'unknown'});
+    });
+  });
 });
