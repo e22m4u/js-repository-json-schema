@@ -65,14 +65,9 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     };
     const requiredFields = [];
     const utils = this.getService(import_js_repository.ModelDefinitionUtils);
-    const propertiesDef = utils.getPropertiesDefinitionInBaseModelHierarchy(modelName);
-    this._injectImplicitPrimaryKeyIfNeeded(
-      modelDef,
-      propertiesDef,
-      schema,
-      opts
-    );
-    for (const [propName, propDef] of Object.entries(propertiesDef)) {
+    const propsDef = utils.getPropertiesDefinitionInBaseModelHierarchy(modelName);
+    this._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts);
+    for (const [propName, propDef] of Object.entries(propsDef)) {
       if (opts.excludeProperties.includes(propName)) {
         continue;
       }
@@ -81,8 +76,8 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
         requiredFields.push(propName);
       }
     }
-    const relationsDef = utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
-    this._injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts);
+    const relsDef = utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
+    this._injectImplicitForeignKeys(relsDef, propsDef, schema, opts);
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
     }
@@ -208,19 +203,19 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * в свойствах текущей модели и ее родителей.
    *
    * @param {object} modelDef
-   * @param {object} propertiesDef
+   * @param {object} propsDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitPrimaryKeyIfNeeded(modelDef, propertiesDef, schema, opts) {
+  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts) {
     if (!modelDef.datasource) {
       return;
     }
-    const hasExplicitPk = Object.values(propertiesDef).some(
+    const hasExplicitPk = Object.values(propsDef).some(
       (prop) => prop && typeof prop === "object" && prop.primaryKey
     );
-    if (!hasExplicitPk && !propertiesDef[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
+    if (!hasExplicitPk && !propsDef[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
       if (!opts.excludeProperties.includes(import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
         schema.properties[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME] = this._createSchemaByType(opts.defaultPrimaryKeyType);
       }
@@ -231,23 +226,26 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * которые возникают из-за связей (relations), но не описаны явно
    * в properties.
    *
-   * @param {object} relationsDef
-   * @param {object} propertiesDef
+   * @param {object} relsDef
+   * @param {object} propsDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts) {
-    for (const [relName, relDef] of Object.entries(relationsDef)) {
-      const foreignKeyDataType = this._resolveForeignKeyDataType(relDef, opts);
+  _injectImplicitForeignKeys(relsDef, propsDef, schema, opts) {
+    for (const [relName, relDef] of Object.entries(relsDef)) {
       if (relDef.type === import_js_repository.RelationType.BELONGS_TO) {
         const foreignKey = relDef.foreignKey || `${relName}Id`;
-        if (!propertiesDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+        if (!propsDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+          const foreignKeyDataType = this._resolveForeignKeyDataType(
+            relDef,
+            opts
+          );
           schema.properties[foreignKey] = this._createSchemaByType(foreignKeyDataType);
         }
         if (relDef.polymorphic) {
           const discriminator = relDef.discriminator || `${relName}Type`;
-          if (!propertiesDef[discriminator] && !opts.excludeProperties.includes(discriminator)) {
+          if (!propsDef[discriminator] && !opts.excludeProperties.includes(discriminator)) {
             schema.properties[discriminator] = this._createSchemaByType(
               import_js_repository.DataType.STRING
             );
@@ -256,7 +254,11 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       } else if (relDef.type === import_js_repository.RelationType.REFERENCES_MANY) {
         const singularRelName = (0, import_js_repository.singularize)(relName);
         const foreignKey = relDef.foreignKey || `${singularRelName}Ids`;
-        if (!propertiesDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+        if (!propsDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+          const foreignKeyDataType = this._resolveForeignKeyDataType(
+            relDef,
+            opts
+          );
           schema.properties[foreignKey] = {
             type: "array",
             items: this._createSchemaByType(foreignKeyDataType)

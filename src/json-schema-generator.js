@@ -59,17 +59,12 @@ export class JsonSchemaGenerator extends Service {
     const requiredFields = [];
     // получение определений свойств по всей иерархии базовых моделей
     const utils = this.getService(ModelDefinitionUtils);
-    const propertiesDef =
+    const propsDef =
       utils.getPropertiesDefinitionInBaseModelHierarchy(modelName);
     // обработка неявного первичного ключа (primary key)
-    this._injectImplicitPrimaryKeyIfNeeded(
-      modelDef,
-      propertiesDef,
-      schema,
-      opts,
-    );
+    this._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts);
     // обработка свойств модели, полученных согласно иерархии
-    for (const [propName, propDef] of Object.entries(propertiesDef)) {
+    for (const [propName, propDef] of Object.entries(propsDef)) {
       if (opts.excludeProperties.includes(propName)) {
         continue;
       }
@@ -80,11 +75,10 @@ export class JsonSchemaGenerator extends Service {
       }
     }
     // получение связей по всей иерархии базовых моделей
-    const relationsDef =
-      utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
+    const relsDef = utils.getRelationsDefinitionInBaseModelHierarchy(modelName);
     // обработка неявных внешних ключей от связей
     // (foreign keys & discriminators)
-    this._injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts);
+    this._injectImplicitForeignKeys(relsDef, propsDef, schema, opts);
     // добавление массива required, если есть обязательные поля
     if (requiredFields.length > 0) {
       schema.required = requiredFields;
@@ -242,23 +236,23 @@ export class JsonSchemaGenerator extends Service {
    * в свойствах текущей модели и ее родителей.
    *
    * @param {object} modelDef
-   * @param {object} propertiesDef
+   * @param {object} propsDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitPrimaryKeyIfNeeded(modelDef, propertiesDef, schema, opts) {
+  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts) {
     // если источник данных не указан,
     // неявный первичный ключ генерировать не нужно
     if (!modelDef.datasource) {
       return;
     }
     // поиск явно заданного первичного ключа в свойствах
-    const hasExplicitPk = Object.values(propertiesDef).some(
+    const hasExplicitPk = Object.values(propsDef).some(
       prop => prop && typeof prop === 'object' && prop.primaryKey,
     );
     // если явного первичного ключа нет и поле "id" (стандартное) не описано
-    if (!hasExplicitPk && !propertiesDef[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
+    if (!hasExplicitPk && !propsDef[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
       if (!opts.excludeProperties.includes(DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
         schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME] =
           this._createSchemaByType(opts.defaultPrimaryKeyType);
@@ -271,25 +265,29 @@ export class JsonSchemaGenerator extends Service {
    * которые возникают из-за связей (relations), но не описаны явно
    * в properties.
    *
-   * @param {object} relationsDef
-   * @param {object} propertiesDef
+   * @param {object} relsDef
+   * @param {object} propsDef
    * @param {object} schema
    * @param {object} opts
    * @private
    */
-  _injectImplicitForeignKeys(relationsDef, propertiesDef, schema, opts) {
-    for (const [relName, relDef] of Object.entries(relationsDef)) {
-      // определение типа ключа для текущей связи
-      const foreignKeyDataType = this._resolveForeignKeyDataType(relDef, opts);
+  _injectImplicitForeignKeys(relsDef, propsDef, schema, opts) {
+    for (const [relName, relDef] of Object.entries(relsDef)) {
       // обработка связи belongsTo
       // (хранит foreign key и, опционально, discriminator)
       if (relDef.type === RelationType.BELONGS_TO) {
         const foreignKey = relDef.foreignKey || `${relName}Id`;
         // внешний ключ
         if (
-          !propertiesDef[foreignKey] &&
+          !propsDef[foreignKey] &&
           !opts.excludeProperties.includes(foreignKey)
         ) {
+          // определение типа ключа для текущей связи
+          const foreignKeyDataType = this._resolveForeignKeyDataType(
+            relDef,
+            opts,
+          );
+          // внедрение внешнего ключа в схему
           schema.properties[foreignKey] =
             this._createSchemaByType(foreignKeyDataType);
         }
@@ -297,7 +295,7 @@ export class JsonSchemaGenerator extends Service {
         if (relDef.polymorphic) {
           const discriminator = relDef.discriminator || `${relName}Type`;
           if (
-            !propertiesDef[discriminator] &&
+            !propsDef[discriminator] &&
             !opts.excludeProperties.includes(discriminator)
           ) {
             schema.properties[discriminator] = this._createSchemaByType(
@@ -312,9 +310,15 @@ export class JsonSchemaGenerator extends Service {
         const singularRelName = singularize(relName);
         const foreignKey = relDef.foreignKey || `${singularRelName}Ids`;
         if (
-          !propertiesDef[foreignKey] &&
+          !propsDef[foreignKey] &&
           !opts.excludeProperties.includes(foreignKey)
         ) {
+          // определение типа ключа для текущей связи
+          const foreignKeyDataType = this._resolveForeignKeyDataType(
+            relDef,
+            opts,
+          );
+          // внедрение внешнего ключа в схему
           schema.properties[foreignKey] = {
             type: 'array',
             items: this._createSchemaByType(foreignKeyDataType),

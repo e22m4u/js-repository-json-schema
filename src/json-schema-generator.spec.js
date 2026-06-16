@@ -268,7 +268,7 @@ describe('JsonSchemaGenerator', function () {
       it('should inject foreign key and discriminator for a polymorphic "belongsTo" relation', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
-          name: 'sourceModel',
+          name: 'model',
           relations: {
             parent: {
               type: RelationType.BELONGS_TO,
@@ -277,7 +277,7 @@ describe('JsonSchemaGenerator', function () {
           },
         });
         const S = dbs.getService(JsonSchemaGenerator);
-        const schema = S.genSchema('sourceModel');
+        const schema = S.genSchema('model');
         expect(schema.properties).to.have.property('parentId');
         expect(schema.properties.parentId).to.be.eql({type: 'number'});
         expect(schema.properties).to.have.property('parentType');
@@ -287,7 +287,7 @@ describe('JsonSchemaGenerator', function () {
       it('should use custom names for a polymorphic "belongsTo" relation', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
-          name: 'sourceModel',
+          name: 'model',
           relations: {
             parent: {
               type: RelationType.BELONGS_TO,
@@ -298,7 +298,7 @@ describe('JsonSchemaGenerator', function () {
           },
         });
         const S = dbs.getService(JsonSchemaGenerator);
-        const schema = S.genSchema('sourceModel');
+        const schema = S.genSchema('model');
         expect(schema.properties).to.have.property('refId');
         expect(schema.properties).to.have.property('refType');
       });
@@ -332,9 +332,11 @@ describe('JsonSchemaGenerator', function () {
         });
       });
 
-      it('should not inject foreign keys for "hasOne" and "hasMany" relations', function () {
+      it('should not inject foreign keys for a "hasOne" relation', function () {
         const dbs = new DatabaseSchema();
-        dbs.defineModel({name: 'targetModel'});
+        dbs.defineModel({
+          name: 'targetModel',
+        });
         dbs.defineModel({
           name: 'sourceModel',
           relations: {
@@ -343,6 +345,22 @@ describe('JsonSchemaGenerator', function () {
               model: 'targetModel',
               foreignKey: 'sourceId',
             },
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('sourceModel');
+        expect(schema.properties).to.not.have.property('childOneId');
+        expect(schema.properties).to.not.have.property('sourceId');
+      });
+
+      it('should not inject foreign keys for a "hasMany" relation', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'targetModel',
+        });
+        dbs.defineModel({
+          name: 'sourceModel',
+          relations: {
             childrenMany: {
               type: RelationType.HAS_MANY,
               model: 'targetModel',
@@ -352,7 +370,6 @@ describe('JsonSchemaGenerator', function () {
         });
         const S = dbs.getService(JsonSchemaGenerator);
         const schema = S.genSchema('sourceModel');
-        expect(schema.properties).to.not.have.property('childOneId');
         expect(schema.properties).to.not.have.property('childrenManyIds');
         expect(schema.properties).to.not.have.property('sourceId');
       });
@@ -435,7 +452,7 @@ describe('JsonSchemaGenerator', function () {
       it('should throw an error if a target model of a relation is not defined', function () {
         const dbs = new DatabaseSchema();
         dbs.defineModel({
-          name: 'sourceModel',
+          name: 'model',
           relations: {
             target: {
               type: RelationType.BELONGS_TO,
@@ -444,7 +461,7 @@ describe('JsonSchemaGenerator', function () {
           },
         });
         const S = dbs.getService(JsonSchemaGenerator);
-        const throwable = () => S.genSchema('sourceModel');
+        const throwable = () => S.genSchema('model');
         expect(throwable).to.throw(
           'Model "unknownModel" must be registered ' +
             'before generating a JSON Schema.',
@@ -871,6 +888,382 @@ describe('JsonSchemaGenerator', function () {
       expect(fn(DataType.OBJECT)).to.be.eql({type: 'object'});
       expect(fn(DataType.ANY)).to.be.eql({});
       expect(fn('unknown')).to.be.eql({type: 'unknown'});
+    });
+  });
+
+  describe('_injectImplicitForeignKeys', function () {
+    describe('belongsTo', function () {
+      it('should inject a default foreign key for a "belongsTo" relation', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {user: {type: RelationType.BELONGS_TO}};
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.have.property('userId');
+        expect(schema.properties.userId).to.be.eql({type: 'number'});
+      });
+
+      it('should use a custom foreignKey name for a "belongsTo" relation if provided', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          user: {
+            type: RelationType.BELONGS_TO,
+            foreignKey: 'ownerId',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'string',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('userId');
+        expect(schema.properties).to.have.property('ownerId');
+        expect(schema.properties.ownerId).to.be.eql({type: 'string'});
+      });
+
+      it('should not inject a foreign key if it is already defined in properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {user: {type: RelationType.BELONGS_TO}};
+        const propsDef = {userId: {type: DataType.STRING}};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        // ожидается, что ключ не будет добавлен, так как он уже есть в propsDef,
+        // основной цикл генерации свойств должен был добавить его ранее
+        expect(schema.properties).to.not.have.property('userId');
+      });
+
+      it('should not inject a foreign key if it is listed in excluded properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {user: {type: RelationType.BELONGS_TO}};
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: ['userId'],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('userId');
+      });
+
+      it("should infer foreign key type from the target model's primary key", function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'model',
+          properties: {
+            id: {
+              type: DataType.STRING,
+              primaryKey: true,
+            },
+          },
+        });
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          target: {
+            type: RelationType.BELONGS_TO,
+            model: 'model',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.have.property('targetId');
+        expect(schema.properties.targetId).to.be.eql({type: 'string'});
+      });
+    });
+
+    describe('belongsTo (polymorphic)', function () {
+      it('should inject a discriminator property for a polymorphic "belongsTo" relation', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          parent: {
+            type: RelationType.BELONGS_TO,
+            polymorphic: true,
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.have.property('parentId');
+        expect(schema.properties.parentId).to.be.eql({type: 'number'});
+        expect(schema.properties).to.have.property('parentType');
+        expect(schema.properties.parentType).to.be.eql({type: 'string'});
+      });
+
+      it('should use a custom discriminator name for a polymorphic "belongsTo" relation if provided', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          parent: {
+            type: RelationType.BELONGS_TO,
+            polymorphic: true,
+            discriminator: 'targetModelName',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('parentType');
+        expect(schema.properties).to.have.property('targetModelName');
+        expect(schema.properties.targetModelName).to.be.eql({type: 'string'});
+      });
+
+      it('should not inject a discriminator if it is already defined in properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          parent: {
+            type: RelationType.BELONGS_TO,
+            polymorphic: true,
+          },
+        };
+        const propsDef = {parentType: {type: DataType.STRING}};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('parentType');
+        expect(schema.properties).to.have.property('parentId');
+      });
+
+      it('should not inject a discriminator if it is listed in excluded properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          parent: {
+            type: RelationType.BELONGS_TO,
+            polymorphic: true,
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: ['parentType'],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('parentType');
+        expect(schema.properties).to.have.property('parentId');
+      });
+    });
+
+    describe('hasOne', function () {
+      it('should ignore a "hasOne" relation', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          child: {
+            type: RelationType.HAS_ONE,
+            model: 'targetModel',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.be.empty;
+      });
+    });
+
+    describe('hasMany', function () {
+      it('should ignore a "hasMany" relation', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          children: {
+            type: RelationType.HAS_MANY,
+            model: 'targetModel',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.be.empty;
+      });
+    });
+
+    describe('referencesMany', function () {
+      it('should inject an array of foreign keys for a "referencesMany" relation', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {categories: {type: RelationType.REFERENCES_MANY}};
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.have.property('categoryIds');
+        expect(schema.properties.categoryIds).to.be.eql({
+          type: 'array',
+          items: {type: 'number'},
+        });
+      });
+
+      it('should use a custom foreignKey name for a "referencesMany" relation if provided', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {
+          categories: {
+            type: RelationType.REFERENCES_MANY,
+            foreignKey: 'arrayOfCategoryIds',
+          },
+        };
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'string',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('categoryIds');
+        expect(schema.properties).to.have.property('arrayOfCategoryIds');
+        expect(schema.properties.arrayOfCategoryIds).to.be.eql({
+          type: 'array',
+          items: {type: 'string'},
+        });
+      });
+
+      it('should not inject foreign keys for a "referencesMany" relation if defined in properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {categories: {type: RelationType.REFERENCES_MANY}};
+        const propsDef = {categoryIds: {type: DataType.ARRAY}};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: [],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        // ожидается, что ключ не будет добавлен, так как он уже есть в propsDef,
+        // основной цикл генерации свойств должен был добавить его ранее
+        expect(schema.properties).to.not.have.property('categoryIds');
+      });
+
+      it('should not inject foreign keys for "referencesMany" relation if listed in excluded properties', function () {
+        const dbs = new DatabaseSchema();
+        const generator = dbs.getService(JsonSchemaGenerator);
+        const relsDef = {categories: {type: RelationType.REFERENCES_MANY}};
+        const propsDef = {};
+        const schema = {properties: {}};
+        const options = {
+          excludeProperties: ['categoryIds'],
+          defaultPrimaryKeyType: 'number',
+        };
+        generator._injectImplicitForeignKeys(
+          relsDef,
+          propsDef,
+          schema,
+          options,
+        );
+        expect(schema.properties).to.not.have.property('categoryIds');
+      });
     });
   });
 });
