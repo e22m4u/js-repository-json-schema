@@ -1266,4 +1266,178 @@ describe('JsonSchemaGenerator', function () {
       });
     });
   });
+
+  describe('_resolveForeignKeyDataType', function () {
+    it('should return a default type if a given relation is polymorphic', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        polymorphic: true,
+      };
+      const options = {defaultPrimaryKeyType: 'string'};
+      const res = S._resolveForeignKeyDataType(relDef, options);
+      expect(res).to.be.eq('string');
+    });
+
+    it('should throw an error if a target model is not registered', function () {
+      const dbs = new DatabaseSchema();
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        model: 'unknownModel',
+      };
+      const options = {defaultPrimaryKeyType: 'number'};
+      const throwable = () => S._resolveForeignKeyDataType(relDef, options);
+      expect(throwable).to.throw(
+        'Model "unknownModel" must be registered ' +
+          'before generating a JSON Schema.',
+      );
+    });
+
+    it('should return an explicit primary key type of the target model', function () {
+      const dbs = new DatabaseSchema();
+      dbs.defineModel({
+        name: 'targetModel',
+        properties: {
+          customId: {
+            type: DataType.STRING,
+            primaryKey: true,
+          },
+        },
+      });
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        model: 'targetModel',
+      };
+      const options = {defaultPrimaryKeyType: 'number'};
+      const res = S._resolveForeignKeyDataType(relDef, options);
+      expect(res).to.be.eq(DataType.STRING);
+    });
+
+    it('should return a default type if a target model primary key type is any', function () {
+      const dbs = new DatabaseSchema();
+      dbs.defineModel({
+        name: 'targetModel',
+        properties: {
+          id: {
+            type: DataType.ANY,
+            primaryKey: true,
+          },
+        },
+      });
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        model: 'targetModel',
+      };
+      const options = {defaultPrimaryKeyType: 'string'};
+      const res = S._resolveForeignKeyDataType(relDef, options);
+      expect(res).to.be.eq('string');
+    });
+
+    it('should return a default type if a target model does not have an explicit primary key', function () {
+      const dbs = new DatabaseSchema();
+      dbs.defineModel({
+        name: 'targetModel',
+        properties: {
+          foo: DataType.STRING,
+        },
+      });
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        model: 'targetModel',
+      };
+      const options = {defaultPrimaryKeyType: 'string'};
+      const res = S._resolveForeignKeyDataType(relDef, options);
+      expect(res).to.be.eq('string');
+    });
+
+    it('should fall back to a default type if an internal error occurs (e.g. circular inheritance)', function () {
+      const dbs = new DatabaseSchema();
+      // намеренно созданное циклическое наследование, которое вызовет ошибку
+      // внутри ModelDefinitionUtils.getPropertiesDefinitionInBaseModelHierarchy
+      dbs.defineModel({
+        name: 'modelA',
+        base: 'modelB',
+      });
+      dbs.defineModel({
+        name: 'modelB',
+        base: 'modelA',
+      });
+      const S = dbs.getService(JsonSchemaGenerator);
+      const relDef = {
+        type: RelationType.BELONGS_TO,
+        model: 'modelA',
+      };
+      const options = {defaultPrimaryKeyType: 'number'};
+      const res = S._resolveForeignKeyDataType(relDef, options);
+      expect(res).to.be.eq('number');
+    });
+  });
+
+  describe('_resolveExtensionKeywords', function () {
+    it('returns an empty object if a definition has no keys starting with "x-js-" prefix', function () {
+      const generator = new JsonSchemaGenerator();
+      const def = {
+        name: 'user',
+        properties: {
+          email: 'string',
+        },
+      };
+      const result = generator._resolveExtensionKeywords(def);
+      expect(result).to.be.eql({});
+    });
+
+    it('extracts keys starting with "x-js-" and removes the prefix', function () {
+      const generator = new JsonSchemaGenerator();
+      const def = {
+        'x-js-title': 'User Model',
+        'x-js-description': 'A user description',
+      };
+      const result = generator._resolveExtensionKeywords(def);
+      expect(result).to.be.eql({
+        title: 'User Model',
+        description: 'A user description',
+      });
+    });
+
+    it('ignores standard keys when extracting extensions', function () {
+      const generator = new JsonSchemaGenerator();
+      const def = {
+        name: 'user',
+        type: 'object',
+        'x-js-format': 'email',
+      };
+      const result = generator._resolveExtensionKeywords(def);
+      expect(result).to.be.eql({format: 'email'});
+    });
+
+    it('ignores keys that only equal the prefix "x-js-" without a suffix', function () {
+      const generator = new JsonSchemaGenerator();
+      const def = {
+        'x-js-': 'invalid-empty-suffix',
+        'x-js-valid': 'valid-suffix',
+      };
+      const result = generator._resolveExtensionKeywords(def);
+      expect(result).to.be.eql({
+        valid: 'valid-suffix',
+      });
+    });
+
+    it('preserves complex structures as extension values', function () {
+      const generator = new JsonSchemaGenerator();
+      const def = {
+        'x-js-examples': ['foo', 'bar'],
+        'x-js-custom-meta': {nested: true, value: 123},
+      };
+      const result = generator._resolveExtensionKeywords(def);
+      expect(result).to.be.eql({
+        examples: ['foo', 'bar'],
+        'custom-meta': {nested: true, value: 123},
+      });
+    });
+  });
 });

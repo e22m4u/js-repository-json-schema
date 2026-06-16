@@ -141,11 +141,11 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * репозитория в JSON Schema объект.
    *
    * @param   {string|object} propDef Определение свойства
-   * @param   {object}        opts    Настройки генератора
+   * @param   {object}        options Настройки генератора
    * @returns {object}
    * @private
    */
-  _mapPropertyToSchema(propDef, opts) {
+  _mapPropertyToSchema(propDef, options) {
     if (typeof propDef === "string") {
       return this._createSchemaByType(propDef);
     }
@@ -153,12 +153,12 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       return {};
     }
     if (propDef.type === import_js_repository.DataType.OBJECT && propDef.model) {
-      return opts.refFactory(propDef.model);
+      return options.refFactory(propDef.model);
     }
     if (propDef.type === import_js_repository.DataType.ARRAY && propDef.itemModel) {
       return {
         type: "array",
-        items: opts.refFactory(propDef.itemModel)
+        items: options.refFactory(propDef.itemModel)
       };
     }
     const schema = this._createSchemaByType(propDef.type);
@@ -205,10 +205,10 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * @param {object} modelDef
    * @param {object} propsDef
    * @param {object} schema
-   * @param {object} opts
+   * @param {object} options
    * @private
    */
-  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts) {
+  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options) {
     if (!modelDef.datasource) {
       return;
     }
@@ -216,8 +216,8 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       (prop) => prop && typeof prop === "object" && prop.primaryKey
     );
     if (!hasExplicitPk && !propsDef[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
-      if (!opts.excludeProperties.includes(import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
-        schema.properties[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME] = this._createSchemaByType(opts.defaultPrimaryKeyType);
+      if (!options.excludeProperties.includes(import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
+        schema.properties[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME] = this._createSchemaByType(options);
       }
     }
   }
@@ -229,23 +229,23 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
    * @param {object} relsDef
    * @param {object} propsDef
    * @param {object} schema
-   * @param {object} opts
+   * @param {object} options
    * @private
    */
-  _injectImplicitForeignKeys(relsDef, propsDef, schema, opts) {
+  _injectImplicitForeignKeys(relsDef, propsDef, schema, options) {
     for (const [relName, relDef] of Object.entries(relsDef)) {
       if (relDef.type === import_js_repository.RelationType.BELONGS_TO) {
         const foreignKey = relDef.foreignKey || `${relName}Id`;
-        if (!propsDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+        if (!propsDef[foreignKey] && !options.excludeProperties.includes(foreignKey)) {
           const foreignKeyDataType = this._resolveForeignKeyDataType(
             relDef,
-            opts
+            options
           );
           schema.properties[foreignKey] = this._createSchemaByType(foreignKeyDataType);
         }
         if (relDef.polymorphic) {
           const discriminator = relDef.discriminator || `${relName}Type`;
-          if (!propsDef[discriminator] && !opts.excludeProperties.includes(discriminator)) {
+          if (!propsDef[discriminator] && !options.excludeProperties.includes(discriminator)) {
             schema.properties[discriminator] = this._createSchemaByType(
               import_js_repository.DataType.STRING
             );
@@ -254,10 +254,10 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       } else if (relDef.type === import_js_repository.RelationType.REFERENCES_MANY) {
         const singularRelName = (0, import_js_repository.singularize)(relName);
         const foreignKey = relDef.foreignKey || `${singularRelName}Ids`;
-        if (!propsDef[foreignKey] && !opts.excludeProperties.includes(foreignKey)) {
+        if (!propsDef[foreignKey] && !options.excludeProperties.includes(foreignKey)) {
           const foreignKeyDataType = this._resolveForeignKeyDataType(
             relDef,
-            opts
+            options
           );
           schema.properties[foreignKey] = {
             type: "array",
@@ -270,16 +270,16 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
   /**
    * Пытается определить тип первичного ключа целевой модели.
    * Если связь полиморфная или тип ключа ANY, то возвращает
-   * тип по умолчанию (opts.defaultPrimaryKeyType).
+   * тип по умолчанию (options.defaultPrimaryKeyType).
    *
-   * @param   {object} relDef Определение связи
-   * @param   {object} opts   Настройки генератора
+   * @param   {object} relDef  Определение связи
+   * @param   {object} options Настройки генератора
    * @returns {string} Тип данных (DataType)
    * @private
    */
-  _resolveForeignKeyDataType(relDef, opts) {
+  _resolveForeignKeyDataType(relDef, options) {
     if (!relDef.model) {
-      return opts.defaultPrimaryKeyType;
+      return options.defaultPrimaryKeyType;
     }
     const registry = this.getService(import_js_repository.DefinitionRegistry);
     if (!registry.hasModel(relDef.model)) {
@@ -297,7 +297,7 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       }
     } catch {
     }
-    return opts.defaultPrimaryKeyType;
+    return options.defaultPrimaryKeyType;
   }
   /**
    * Извлечение ключей-расширений из определения

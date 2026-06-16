@@ -161,11 +161,11 @@ export class JsonSchemaGenerator extends Service {
    * репозитория в JSON Schema объект.
    *
    * @param   {string|object} propDef Определение свойства
-   * @param   {object}        opts    Настройки генератора
+   * @param   {object}        options Настройки генератора
    * @returns {object}
    * @private
    */
-  _mapPropertyToSchema(propDef, opts) {
+  _mapPropertyToSchema(propDef, options) {
     // если передана краткая форма (просто строка DataType)
     if (typeof propDef === 'string') {
       return this._createSchemaByType(propDef);
@@ -175,13 +175,13 @@ export class JsonSchemaGenerator extends Service {
     }
     // если это вложенный объект, ссылающийся на другую модель
     if (propDef.type === DataType.OBJECT && propDef.model) {
-      return opts.refFactory(propDef.model);
+      return options.refFactory(propDef.model);
     }
     // если это массив элементов, ссылающихся на другую модель
     if (propDef.type === DataType.ARRAY && propDef.itemModel) {
       return {
         type: 'array',
-        items: opts.refFactory(propDef.itemModel),
+        items: options.refFactory(propDef.itemModel),
       };
     }
     // получение базовой схемы с учетом типа
@@ -238,10 +238,10 @@ export class JsonSchemaGenerator extends Service {
    * @param {object} modelDef
    * @param {object} propsDef
    * @param {object} schema
-   * @param {object} opts
+   * @param {object} options
    * @private
    */
-  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, opts) {
+  _injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options) {
     // если источник данных не указан,
     // неявный первичный ключ генерировать не нужно
     if (!modelDef.datasource) {
@@ -253,9 +253,11 @@ export class JsonSchemaGenerator extends Service {
     );
     // если явного первичного ключа нет и поле "id" (стандартное) не описано
     if (!hasExplicitPk && !propsDef[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
-      if (!opts.excludeProperties.includes(DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
+      if (
+        !options.excludeProperties.includes(DEFAULT_PRIMARY_KEY_PROPERTY_NAME)
+      ) {
         schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME] =
-          this._createSchemaByType(opts.defaultPrimaryKeyType);
+          this._createSchemaByType(options);
       }
     }
   }
@@ -268,10 +270,10 @@ export class JsonSchemaGenerator extends Service {
    * @param {object} relsDef
    * @param {object} propsDef
    * @param {object} schema
-   * @param {object} opts
+   * @param {object} options
    * @private
    */
-  _injectImplicitForeignKeys(relsDef, propsDef, schema, opts) {
+  _injectImplicitForeignKeys(relsDef, propsDef, schema, options) {
     for (const [relName, relDef] of Object.entries(relsDef)) {
       // обработка связи belongsTo
       // (хранит foreign key и, опционально, discriminator)
@@ -280,12 +282,12 @@ export class JsonSchemaGenerator extends Service {
         // внешний ключ
         if (
           !propsDef[foreignKey] &&
-          !opts.excludeProperties.includes(foreignKey)
+          !options.excludeProperties.includes(foreignKey)
         ) {
           // определение типа ключа для текущей связи
           const foreignKeyDataType = this._resolveForeignKeyDataType(
             relDef,
-            opts,
+            options,
           );
           // внедрение внешнего ключа в схему
           schema.properties[foreignKey] =
@@ -296,7 +298,7 @@ export class JsonSchemaGenerator extends Service {
           const discriminator = relDef.discriminator || `${relName}Type`;
           if (
             !propsDef[discriminator] &&
-            !opts.excludeProperties.includes(discriminator)
+            !options.excludeProperties.includes(discriminator)
           ) {
             schema.properties[discriminator] = this._createSchemaByType(
               DataType.STRING,
@@ -311,12 +313,12 @@ export class JsonSchemaGenerator extends Service {
         const foreignKey = relDef.foreignKey || `${singularRelName}Ids`;
         if (
           !propsDef[foreignKey] &&
-          !opts.excludeProperties.includes(foreignKey)
+          !options.excludeProperties.includes(foreignKey)
         ) {
           // определение типа ключа для текущей связи
           const foreignKeyDataType = this._resolveForeignKeyDataType(
             relDef,
-            opts,
+            options,
           );
           // внедрение внешнего ключа в схему
           schema.properties[foreignKey] = {
@@ -333,17 +335,17 @@ export class JsonSchemaGenerator extends Service {
   /**
    * Пытается определить тип первичного ключа целевой модели.
    * Если связь полиморфная или тип ключа ANY, то возвращает
-   * тип по умолчанию (opts.defaultPrimaryKeyType).
+   * тип по умолчанию (options.defaultPrimaryKeyType).
    *
-   * @param   {object} relDef Определение связи
-   * @param   {object} opts   Настройки генератора
+   * @param   {object} relDef  Определение связи
+   * @param   {object} options Настройки генератора
    * @returns {string} Тип данных (DataType)
    * @private
    */
-  _resolveForeignKeyDataType(relDef, opts) {
+  _resolveForeignKeyDataType(relDef, options) {
     // если целевая модель не указана (например, полиморфная связь)
     if (!relDef.model) {
-      return opts.defaultPrimaryKeyType;
+      return options.defaultPrimaryKeyType;
     }
     const registry = this.getService(DefinitionRegistry);
     // если целевая модель еще не зарегистрирована
@@ -368,7 +370,7 @@ export class JsonSchemaGenerator extends Service {
       // и просто провал к типу по умолчанию
     }
     // во всех остальных случаях используется значение по умолчанию
-    return opts.defaultPrimaryKeyType;
+    return options.defaultPrimaryKeyType;
   }
 
   /**
