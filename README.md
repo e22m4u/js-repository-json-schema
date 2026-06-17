@@ -238,8 +238,8 @@ const schema = generator.genSchema('user', {
   excludeProperties: ['password', 'internalToken'],
   
   // пользовательская фабрика для генерации $ref ссылок
-  // по умолчанию modelName => ({ $ref: `#/components/schemas/${modelName}` })
-  refFactory: (modelName) => ({$ref: `#/components/schemas/${modelName}Input`}),
+  // по умолчанию: modelName => ({$ref: modelName})
+  refFactory: (modelName) => ({$ref: `#/components/schemas/${modelName}`}),
   
   // тип первичных и внешних ключей по умолчанию
   // "number" или "string" (по умолчанию "number")

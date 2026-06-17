@@ -149,9 +149,7 @@ export class JsonSchemaGenerator extends Service {
   _normalizeOptions(options) {
     return {
       excludeProperties: options.excludeProperties || [],
-      refFactory:
-        options.refFactory ||
-        (modelName => ({$ref: `#/components/schemas/${modelName}`})),
+      refFactory: options.refFactory || (modelName => ({$ref: modelName})),
       defaultPrimaryKeyType: options.defaultPrimaryKeyType || 'number',
     };
   }
