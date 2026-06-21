@@ -21,9 +21,21 @@ var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: tru
 // src/index.js
 var index_exports = {};
 __export(index_exports, {
-  JsonSchemaGenerator: () => JsonSchemaGenerator
+  JsonSchemaGenerator: () => JsonSchemaGenerator,
+  JsonType: () => JsonType
 });
 module.exports = __toCommonJS(index_exports);
+
+// src/json-schema.js
+var JsonType = {
+  STRING: "string",
+  NUMBER: "number",
+  INTEGER: "integer",
+  BOOLEAN: "boolean",
+  OBJECT: "object",
+  ARRAY: "array",
+  NULL: "null"
+};
 
 // src/json-schema-generator.js
 var import_js_service = require("@e22m4u/js-service");
@@ -322,5 +334,6 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
 };
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
-  JsonSchemaGenerator
+  JsonSchemaGenerator,
+  JsonType
 });

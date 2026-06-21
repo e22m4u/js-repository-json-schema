@@ -1,22 +1,10 @@
 import {Service} from '@e22m4u/js-service';
+import {JsonSchemaObject} from './json-schema.js';
 
 /**
- * Структура, которую возвращает генератор.
+ * Gen schema options.
  */
-interface JsonSchema {
-  type?: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  properties?: Record<string, JsonSchema>;
-  required?: string[];
-  items?: JsonSchema;
-  default?: unknown;
-  $ref?: string;
-  allOf?: JsonSchema[];
-}
-
-/**
- * Опции, которые принимает метод.
- */
-interface JsonSchemaGeneratorOptions {
+interface GenSchemaOptions {
   excludeProperties?: string[];
   refFactory?: (modelName: string) => {$ref: string};
   defaultPrimaryKeyType?: 'number' | 'string';
@@ -32,8 +20,5 @@ export class JsonSchemaGenerator extends Service {
    * @param modelName Название модели
    * @param options   Опции генерации
    */
-  genSchema(
-    modelName: string,
-    options?: JsonSchemaGeneratorOptions,
-  ): JsonSchema;
+  genSchema(modelName: string, options?: GenSchemaOptions): JsonSchemaObject;
 }
