@@ -1,6 +1,6 @@
 {
   "name": "@e22m4u/js-repository-json-schema",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Модуль генерации JSON Schema для @e22m4u/js-repository",
   "author": "Mikhail Evstropov <e22m4u@yandex.ru>",
   "license": "MIT",
