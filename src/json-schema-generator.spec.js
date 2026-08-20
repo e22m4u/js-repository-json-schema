@@ -75,6 +75,9 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.have.property(
           DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
         );
+        expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+          type: 'number',
+        });
       });
 
       it('should inject a primary key at the beginning of the properties object', function () {
@@ -107,6 +110,22 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.properties).to.not.have.property(
           DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
         );
+      });
+
+      it('should respect "defaultPrimaryKeyType" option for implicit primary key', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({name: 'modelWithDb', datasource: 'memory'});
+        const S = dbs.getService(JsonSchemaGenerator);
+        const schema = S.genSchema('modelWithDb', {
+          defaultPrimaryKeyType: 'string',
+        });
+        expect(schema.properties).to.have.property(
+          DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+        );
+        expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+          type: 'string',
+        });
       });
     });
 
@@ -888,6 +907,83 @@ describe('JsonSchemaGenerator', function () {
       expect(fn(DataType.OBJECT)).to.be.eql({type: 'object'});
       expect(fn(DataType.ANY)).to.be.eql({});
       expect(fn('unknown')).to.be.eql({type: 'unknown'});
+    });
+  });
+
+  describe('_injectImplicitPrimaryKeyIfNeeded', function () {
+    it('should not inject a primary key if a datasource is not defined', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model'};
+      const propsDef = {};
+      const schema = {properties: {}};
+      const options = {excludeProperties: [], defaultPrimaryKeyType: 'number'};
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.be.empty;
+    });
+
+    it('should not inject a primary key if an explicit primary key already exists', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model', datasource: 'memory'};
+      const propsDef = {customId: {primaryKey: true}};
+      const schema = {properties: {}};
+      const options = {excludeProperties: [], defaultPrimaryKeyType: 'number'};
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.be.empty;
+    });
+
+    it('should not inject a primary key if the default primary key property is already defined', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model', datasource: 'memory'};
+      const propsDef = {
+        [DEFAULT_PRIMARY_KEY_PROPERTY_NAME]: {type: DataType.STRING},
+      };
+      const schema = {properties: {}};
+      const options = {excludeProperties: [], defaultPrimaryKeyType: 'number'};
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.be.empty;
+    });
+
+    it('should not inject a primary key if it is listed in the "excludeProperties" option', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model', datasource: 'memory'};
+      const propsDef = {};
+      const schema = {properties: {}};
+      const options = {
+        excludeProperties: [DEFAULT_PRIMARY_KEY_PROPERTY_NAME],
+        defaultPrimaryKeyType: 'number',
+      };
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.be.empty;
+    });
+
+    it('should inject a default primary key using the "defaultPrimaryKeyType" option as "number"', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model', datasource: 'memory'};
+      const propsDef = {};
+      const schema = {properties: {}};
+      const options = {excludeProperties: [], defaultPrimaryKeyType: 'number'};
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.have.property(
+        DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+      );
+      expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+        type: 'number',
+      });
+    });
+
+    it('should inject a default primary key using the "defaultPrimaryKeyType" option as "string"', function () {
+      const S = new JsonSchemaGenerator();
+      const modelDef = {name: 'model', datasource: 'memory'};
+      const propsDef = {};
+      const schema = {properties: {}};
+      const options = {excludeProperties: [], defaultPrimaryKeyType: 'string'};
+      S._injectImplicitPrimaryKeyIfNeeded(modelDef, propsDef, schema, options);
+      expect(schema.properties).to.have.property(
+        DEFAULT_PRIMARY_KEY_PROPERTY_NAME,
+      );
+      expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+        type: 'string',
+      });
     });
   });
 

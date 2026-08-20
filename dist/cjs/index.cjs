@@ -229,7 +229,7 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     );
     if (!hasExplicitPk && !propsDef[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME]) {
       if (!options.excludeProperties.includes(import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME)) {
-        schema.properties[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME] = this._createSchemaByType(options);
+        schema.properties[import_js_repository.DEFAULT_PRIMARY_KEY_PROPERTY_NAME] = this._createSchemaByType(options.defaultPrimaryKeyType);
       }
     }
   }

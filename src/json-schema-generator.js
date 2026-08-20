@@ -255,7 +255,7 @@ export class JsonSchemaGenerator extends Service {
         !options.excludeProperties.includes(DEFAULT_PRIMARY_KEY_PROPERTY_NAME)
       ) {
         schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME] =
-          this._createSchemaByType(options);
+          this._createSchemaByType(options.defaultPrimaryKeyType);
       }
     }
   }
