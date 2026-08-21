@@ -1,5 +1,5 @@
-import {Service, ServiceContainer} from '@e22m4u/js-service';
 import {JsonSchemaObject} from './json-schema.js';
+import {Service, ServiceContainer} from '@e22m4u/js-service';
 
 /**
  * Gen schema options.
