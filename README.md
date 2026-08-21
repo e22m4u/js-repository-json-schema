@@ -230,10 +230,13 @@ console.log(schema);
 
 ### Настройки схемы
 
-Метод `genSchema` принимает второй необязательный аргумент с настройками.
+Настройки генерации можно задать глобально для всего экземпляра
+`JsonSchemaGenerator` при его получении из сервис-контейнера,
+передав их вторым аргументом (экземпляр создается автоматически).
 
 ```js
-const schema = generator.genSchema('user', {
+// получение генератора с глобальными опциями
+const generator = dbs.getService(JsonSchemaGenerator, {
   // исключить определенные свойства
   // (например, пароли или внутренние ключи)
   excludeProperties: ['password', 'internalToken'],
@@ -246,7 +249,48 @@ const schema = generator.genSchema('user', {
   // "number" или "string" (по умолчанию "number")
   defaultPrimaryKeyType: 'string',
 });
+
+// схема сгенерируется с учетом глобальных настроек
+// (defaultPrimaryKeyType: 'string' и т.д.)
+const userSchema = generator.genSchema('user');
 ```
+
+Глобальные опции также можно задать один раз на этапе инициализации приложения
+(например, при настройке `DatabaseSchema`). Метод `useService` позволяет
+закэшировать экземпляр генератора с нужными настройками.
+
+```js
+import {DatabaseSchema} from '@e22m4u/js-repository';
+import {JsonSchemaGenerator} from '@e22m4u/js-repository-json-schema';
+
+const dbs = new DatabaseSchema();
+
+// создание и кэширование экземпляра с глобальными опциями
+dbs.useService(JsonSchemaGenerator, {
+  excludeProperties: ['password', 'internalToken'],
+  defaultPrimaryKeyType: 'string',
+});
+
+// получение существующего экземпляра генератора
+// и создание схемы в любом месте приложения
+const generator = dbs.getService(JsonSchemaGenerator);
+const userSchema = generator.genSchema('user');
+```
+
+Те же опции можно передать непосредственно в метод `genSchema` вторым
+аргументом. Опции, переданные в метод, имеют приоритет над глобальными
+настройками конструктора и переопределяют их для конкретного вызова.
+
+```js
+// здесь глобальная опция "defaultPrimaryKeyType"
+// переопределяется локально
+const userSchema = generator.genSchema('user', {
+  defaultPrimaryKeyType: 'number',
+});
+```
+
+*i. При переопределении опции `excludeProperties` массивы не объединяются,
+локальный массив полностью заменяет глобальный.*
 
 ### Опция defaultPrimaryKeyType
 
@@ -254,7 +298,7 @@ const schema = generator.genSchema('user', {
 так и внешние ключи) имеют тип `number`. Однако во многих современных
 базах данных для ключей используются строки (например, *UUID* или строковое
 представление *ObjectId*). Опция `defaultPrimaryKeyType` позволяет глобально
-переопределить этот тип на `"string"`.
+переопределить этот тип на `string`.
 
 Данная опция необходима, поскольку генератор не всегда может однозначно
 вывести тип ключа из определения модели. Опция применяется в случаях, указанных
@@ -289,6 +333,9 @@ dbs.defineModel({
 
 // генерация схемы с указанием, что ключи по умолчанию это строки
 const schema = generator.genSchema('file', {
+  // здесь опция передается прямо в метод, но она также
+  // может быть определена глобально для всего экземпляра
+  // генератора (см. раздел «Настройки схемы»)
   defaultPrimaryKeyType: 'string',
 });
 

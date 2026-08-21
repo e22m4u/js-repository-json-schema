@@ -45,7 +45,41 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
     __name(this, "JsonSchemaGenerator");
   }
   /**
+   * Глобальные опции генерации, заданные через конструктор.
+   * Используются в качестве значений по умолчанию для метода
+   * genSchema и могут быть переопределены его вторым аргументом.
+   *
+   * @type {object}
+   * @private
+   */
+  _options;
+  /**
+   * Конструктор.
+   *
+   * @param {import('@e22m4u/js-service').ServiceContainer} [container]                     Сервис-контейнер.
+   * @param {object}                                        [options]                       Глобальные опции генерации.
+   * @param {string[]}                                      [options.excludeProperties]     Массив свойств для исключения из схемы.
+   * @param {Function}                                      [options.refFactory]            Функция для создания $ref строк.
+   * @param {string}                                        [options.defaultPrimaryKeyType] Тип по умолчанию для Primary Key и Foreign Key ('number' или 'string').
+   */
+  constructor(container = void 0, options = void 0) {
+    super(container);
+    if (options !== void 0) {
+      if (options === null || typeof options !== "object" || Array.isArray(options)) {
+        throw new import_js_repository.InvalidArgumentError(
+          'Parameter "options" must be an Object, but %v was given.',
+          options
+        );
+      }
+      this._validateOptions(options);
+    }
+    this._options = options || {};
+  }
+  /**
    * Сгенерировать JSON Schema для указанной модели.
+   *
+   * Опции, переданные вторым аргументом, имеют приоритет над
+   * глобальными опциями, заданными через конструктор.
    *
    * @param   {string}   modelName                       Название модели
    * @param   {object}   [options]                       Опции генерации
@@ -68,7 +102,7 @@ var JsonSchemaGenerator = class extends import_js_service.Service {
       );
     }
     this._validateOptions(options);
-    const opts = this._normalizeOptions(options);
+    const opts = this._normalizeOptions({ ...this._options, ...options });
     const registry = this.getService(import_js_repository.DefinitionRegistry);
     const modelDef = registry.getModel(modelName);
     const schema = {

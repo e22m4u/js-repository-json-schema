@@ -10,6 +10,34 @@ import {
 } from '@e22m4u/js-repository';
 
 describe('JsonSchemaGenerator', function () {
+  describe('constructor', function () {
+    it('should require the "options" parameter to be an Object', function () {
+      const throwable = v => () => new JsonSchemaGenerator(undefined, v);
+      const error = s =>
+        format('Parameter "options" must be an Object, but %s was given.', s);
+      expect(throwable('str')).to.throw(error('"str"'));
+      expect(throwable('')).to.throw(error('""'));
+      expect(throwable(10)).to.throw(error('10'));
+      expect(throwable(0)).to.throw(error('0'));
+      expect(throwable(true)).to.throw(error('true'));
+      expect(throwable(false)).to.throw(error('false'));
+      expect(throwable([])).to.throw(error('Array'));
+      expect(throwable(null)).to.throw(error('null'));
+      throwable({})();
+      throwable(undefined)();
+    });
+
+    it('should validate options passed to the constructor', function () {
+      const throwable = () =>
+        new JsonSchemaGenerator(undefined, {excludeProperties: 'notArray'});
+      const error = format(
+        'Option "excludeProperties" must be an Array, ' +
+          'but "notArray" was given.',
+      );
+      expect(throwable).to.throw(error);
+    });
+  });
+
   describe('genSchema', function () {
     it('should require the parameter "modelName" to be a non-empty String', function () {
       const throwable = v => () => {
@@ -696,6 +724,104 @@ describe('JsonSchemaGenerator', function () {
         expect(schema.required).to.include('baseProp');
         expect(schema.required).to.include('childProp');
         expect(schema.required).to.not.include('overridableProp');
+      });
+    });
+
+    describe('constructor options', function () {
+      it('should use the "excludeProperties" option passed to the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'model',
+          properties: {
+            foo: DataType.STRING,
+            bar: DataType.NUMBER,
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator, {
+          excludeProperties: ['bar'],
+        });
+        const schema = S.genSchema('model');
+        expect(schema.properties).to.have.property('foo');
+        expect(schema.properties).to.not.have.property('bar');
+      });
+
+      it('should use the "defaultPrimaryKeyType" option passed to the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({name: 'model', datasource: 'memory'});
+        const S = dbs.getService(JsonSchemaGenerator, {
+          defaultPrimaryKeyType: 'string',
+        });
+        const schema = S.genSchema('model');
+        expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+          type: 'string',
+        });
+      });
+
+      it('should use the "refFactory" option passed to the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'model',
+          properties: {
+            target: {type: DataType.OBJECT, model: 'model'},
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator, {
+          refFactory: modelName => ({$ref: `#/${modelName}`}),
+        });
+        const schema = S.genSchema('model');
+        expect(schema.properties.target).to.be.eql({$ref: '#/model'});
+      });
+
+      it('should prioritize the "excludeProperties" option passed to genSchema over the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'model',
+          properties: {
+            foo: DataType.STRING,
+            bar: DataType.NUMBER,
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator, {
+          excludeProperties: ['bar'],
+        });
+        const schema = S.genSchema('model', {excludeProperties: ['foo']});
+        expect(schema.properties).to.have.property('bar');
+        expect(schema.properties).to.not.have.property('foo');
+      });
+
+      it('should prioritize the "defaultPrimaryKeyType" option passed to genSchema over the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineDatasource({name: 'memory', adapter: 'memory'});
+        dbs.defineModel({name: 'model', datasource: 'memory'});
+        const S = dbs.getService(JsonSchemaGenerator, {
+          defaultPrimaryKeyType: 'string',
+        });
+        const schema = S.genSchema('model', {
+          defaultPrimaryKeyType: 'number',
+        });
+        expect(schema.properties[DEFAULT_PRIMARY_KEY_PROPERTY_NAME]).to.be.eql({
+          type: 'number',
+        });
+      });
+
+      it('should prioritize the "refFactory" option passed to genSchema over the constructor', function () {
+        const dbs = new DatabaseSchema();
+        dbs.defineModel({
+          name: 'model',
+          properties: {
+            target: {type: DataType.OBJECT, model: 'model'},
+          },
+        });
+        const S = dbs.getService(JsonSchemaGenerator, {
+          refFactory: modelName => ({$ref: `#/constructor/${modelName}`}),
+        });
+        const schema = S.genSchema('model', {
+          refFactory: modelName => ({$ref: `#/genSchema/${modelName}`}),
+        });
+        expect(schema.properties.target).to.be.eql({
+          $ref: '#/genSchema/model',
+        });
       });
     });
   });

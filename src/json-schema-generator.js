@@ -16,7 +16,47 @@ import {
  */
 export class JsonSchemaGenerator extends Service {
   /**
+   * Глобальные опции генерации, заданные через конструктор.
+   * Используются в качестве значений по умолчанию для метода
+   * genSchema и могут быть переопределены его вторым аргументом.
+   *
+   * @type {object}
+   * @private
+   */
+  _options;
+
+  /**
+   * Конструктор.
+   *
+   * @param {import('@e22m4u/js-service').ServiceContainer} [container]                     Сервис-контейнер.
+   * @param {object}                                        [options]                       Глобальные опции генерации.
+   * @param {string[]}                                      [options.excludeProperties]     Массив свойств для исключения из схемы.
+   * @param {Function}                                      [options.refFactory]            Функция для создания $ref строк.
+   * @param {string}                                        [options.defaultPrimaryKeyType] Тип по умолчанию для Primary Key и Foreign Key ('number' или 'string').
+   */
+  constructor(container = undefined, options = undefined) {
+    super(container);
+    if (options !== undefined) {
+      if (
+        options === null ||
+        typeof options !== 'object' ||
+        Array.isArray(options)
+      ) {
+        throw new InvalidArgumentError(
+          'Parameter "options" must be an Object, but %v was given.',
+          options,
+        );
+      }
+      this._validateOptions(options);
+    }
+    this._options = options || {};
+  }
+
+  /**
    * Сгенерировать JSON Schema для указанной модели.
+   *
+   * Опции, переданные вторым аргументом, имеют приоритет над
+   * глобальными опциями, заданными через конструктор.
    *
    * @param   {string}   modelName                       Название модели
    * @param   {object}   [options]                       Опции генерации
@@ -44,10 +84,11 @@ export class JsonSchemaGenerator extends Service {
         options,
       );
     }
-    // проверка опций и инициализация
-    // значений по умолчанию
+    // проверка опций и инициализация значений по умолчанию
+    // с учетом приоритета над глобальными опциями, заданными
+    // через конструктор
     this._validateOptions(options);
-    const opts = this._normalizeOptions(options);
+    const opts = this._normalizeOptions({...this._options, ...options});
     // получение определения модели из реестра
     const registry = this.getService(DefinitionRegistry);
     const modelDef = registry.getModel(modelName);
